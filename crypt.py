@@ -24,25 +24,22 @@ class Message:
 		self.message=message
 		self.block=32
 		self.password=hashlib.sha256(password.encode('utf-8')).digest()
-		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
-
 		if (message == ''): 
 			self.len = 0
-			self.fullmessage = message
-			self.crypted_string ='                                                                                                                                               '
+			self.fullmessage = self.crypted_string = ' '
 		else:
 			self.len = len(self.message)
 			self.fullmessage = "len="+str(len(self.message))+";"+message
 
 	def make_block(self):
 		tmp=''
-		if ((len(self.fullmessage) % self.block) != 0):
-			for i in range ((len(self.fullmessage) % self.block), self.block):
-				tmp += chr(random.randint(32,127))
+		if ((len(self.fullmessage) % self.block) != 0): 
+			for i in range ((len(self.fullmessage) % self.block), self.block): tmp += chr(random.randint(32,127))
 		self.fullmessage += tmp
 
 	def string_to_bits(self):
 		fullmessage = bytes(self.fullmessage, encoding="UTF-8")
+		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
 		message = self.crypt.encrypt(fullmessage)
 		tmp = ((''.join (map(bin, message)))[2:]).split('0b')
 		for i in range (0, len(tmp)): tmp[i]=tmp[i].zfill(8)
@@ -53,6 +50,9 @@ class Message:
 		self.fullmessage=self.crypt.decrypt(string).decode()
 		(self.len, self.message) = (self.fullmessage[4:]).split(';',1)
 		self.len = int(self.len)
+	
+	def get_full_lenght(self):
+		self.full_lenght = (((4+len(str(self.len))+self.len)//self.block+1)*self.block)*8
 
 class Pictures:
 
@@ -66,18 +66,12 @@ class Pictures:
 
 	def save_picture (self):
 		self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
-	
-	def int_bin (self, num):
-		return (bin(num))
-
-	def bin_int (self, num):
-		return(int(num, 2))
 
 	def add_bit(self, num, bit):
-		return (self.bin_int((self.int_bin(num))[:-1]+bit))
+		return (int(((bin(num))[:-1]+bit), 2))
 
 	def get_bit(self,num):
-		return (self.int_bin(num)[-1:])
+		return (bin(num)[-1:])
 
 	def get_colour(self, x, y):
 		return(self.pix[x,y])
@@ -95,14 +89,13 @@ class Pictures:
 	def getting_bits(self,x,y,stepnumber,count,binbit,tmpstr):
 		if count >= 0:
 			(r,g,b)=self.get_colour(x,y)
-			count -= 1
 			tmpstr += str(self.get_bit(b))
+			count -= 1
 		return (tmpstr, count)
 
 	def decoding_bits(self, string):
 		tmp=[]
-		for i in range (0, len(string), 8):
-			tmp.append(self.bin_int('0b'+string[i:i+8]))
+		for i in range (0, len(string), 8): tmp.append(int(('0b'+string[i:i+8]), 2))
 		return (bytes(tmp))
 
 	def spiral_replacement(self, binstring):
@@ -150,10 +143,9 @@ if (sys.argv[1] == "get"):
 	p1.load_picture()
 	print ('Picture - '+str(sys.argv[2]))
 	x = Message('',sys.argv[3])
-	x.len=32
 	x.get_lenght(p1.decoding_bits(p1.spiral_getting(x.block, x.crypted_string)))
-	full_lenght = (((4+len(str(x.len))+x.len)//x.block+1)*x.block)*8
-	x.get_lenght(p1.decoding_bits(p1.spiral_getting2(full_lenght, x.crypted_string)))
+	x.get_full_lenght()
+	x.get_lenght(p1.decoding_bits(p1.spiral_getting2(x.full_lenght, x.crypted_string)))
 	print ('Message Lenght - '+str(x.len))
 	print ('Message - '+x.message[0:x.len])
 	print ('Full Message - '+x.message)
@@ -163,8 +155,8 @@ if (sys.argv[1] == "add"):
 	print ("Message - "+x.message)
 	print ("Message Length - "+str(x.len))
 	x.make_block()
-	print ("Line ready for crypting("+str(len(x.fullmessage))+'bytes) - '+x.fullmessage)
 	x.string_to_bits()
+	print ("Line ready for crypting("+str(len(x.fullmessage))+'bytes) - '+x.fullmessage)
 	print ("binary version("+str(len(x.crypted_string))+' bits) - '+x.crypted_string)
 	p = Pictures (sys.argv[2])
 	p.load_picture()
