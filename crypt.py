@@ -106,39 +106,39 @@ class Pictures:
 		return (bytes(tmp))
 
 	def spiral_replacement(self, binstring):
-		self.spiral_walk(self.x,self.y, 0, len(binstring), binstring, ' ', self.adding_bits)
+		self.spiral_walk(0, len(binstring), binstring, ' ', self.adding_bits)
 
 	def spiral_getting(self, block, string):
-		return (self.spiral_walk(self.x,self.y, 0, (block*8)-1, string.zfill(block*8), '', self.getting_bits))
+		return (self.spiral_walk(0, (block*8)-1, string.zfill(block*8), '', self.getting_bits))
 
 	def spiral_getting2(self, full_lenght, string):
-		return (self.spiral_walk(self.x,self.y, 0, full_lenght-1, string.zfill(full_lenght), '', self.getting_bits))
+		return (self.spiral_walk(0, full_lenght-1, string.zfill(full_lenght), '', self.getting_bits))
 
-	def spiral_walk(self,x,y,stepnumber,count, binstring,tmpstr, method):
+	def spiral_walk(self,stepnumber,count, binstring,tmpstr, method):
 
-		if ((x//2>=stepnumber) & (y//2>=stepnumber) & (count>-1)):
+		if ((self.x//2>=stepnumber) & (self.y//2>=stepnumber) & (count>-1)):
 
-			for i in range (stepnumber,x-stepnumber): (tmpstr, count)=method(stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
+			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
 
-			if not ((x>y) & (y%2==0) & (y//2==stepnumber)):
+			if not ((self.x>self.y) & (self.y%2==0) & (self.y//2==stepnumber)):
 
-				for i in range (stepnumber,y-stepnumber): (tmpstr, count)=method(i,x-stepnumber,stepnumber,count,binstring[-count],tmpstr)
+				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,stepnumber,count,binstring[-count],tmpstr)
 
-				for i in range (x-stepnumber,stepnumber,-1): (tmpstr, count)=method(y-stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
+				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
 
-				if (not (x<y) & (x%2==0) & (x//2==stepnumber)):
-					for i in range (y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,stepnumber,count,binstring[-count],tmpstr)
+				if (not (self.x<self.y) & (self.x%2==0) & (self.x//2==stepnumber)):
+					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,stepnumber,count,binstring[-count],tmpstr)
 
 			stepnumber += 1
-			tmpstr=self.spiral_walk(x,y,stepnumber,count,binstring,tmpstr,method)
+			tmpstr=self.spiral_walk(stepnumber,count,binstring,tmpstr,method)
 
-		elif ((x%2==0) | (y%2==0)):
-			if (x==y):
+		elif ((self.x%2==0) | (self.y%2==0)):
+			if (self.x==self.y):
 				(tmpstr, count)=method(stepnumber,stepnumber,stepnumber,count,binstring[-count],tmpstr)
-			if ((x<y) & (x%2==0)):
-				(tmpstr, count)=method(y-stepnumber+1,stepnumber-1,stepnumber,count,binstring[-count],tmpstr)
-			if ((x>y) & (y%2==0)):
-				(tmpstr, count)=method(stepnumber-1,x-stepnumber+1,stepnumber,count,binstring[-count],tmpstr)
+			if ((self.x<self.y) & (self.x%2==0)):
+				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,stepnumber,count,binstring[-count],tmpstr)
+			if ((self.x>self.y) & (self.y%2==0)):
+				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,stepnumber,count,binstring[-count],tmpstr)
 		return (tmpstr)
 
 if (len(sys.argv) < 3):  
