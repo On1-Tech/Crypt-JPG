@@ -1,6 +1,7 @@
 import random, base64, sys, hashlib
 from PIL import Image
 from Crypto.Cipher import AES
+from functools import reduce
 
 class Files:
 
@@ -32,18 +33,15 @@ class Message:
 			self.fullmessage = "len="+str(len(self.message))+";"+message
 
 	def make_block(self):
-		tmp=''
 		if ((len(self.fullmessage) % self.block) != 0): 
-			for i in range ((len(self.fullmessage) % self.block), self.block): tmp += chr(random.randint(32,127))
-		self.fullmessage += tmp
+			self.fullmessage += reduce(lambda x,y: x+chr(random.randint(32,127)), (['']+ list(range ((len(self.fullmessage) % self.block), self.block))))
 
 	def string_to_bits(self):
 		fullmessage = bytes(self.fullmessage, encoding="UTF-8")
 		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
 		message = self.crypt.encrypt(fullmessage)
 		tmp = ((''.join (map(bin, message)))[2:]).split('0b')
-		for i in range (0, len(tmp)): tmp[i]=tmp[i].zfill(8)
-		self.crypted_string = ''.join(tmp)
+		self.crypted_string = ''.join((map(lambda x: x.zfill(8), tmp)))
 
 	def get_lenght(self,string):
 		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
@@ -79,14 +77,14 @@ class Pictures:
 	def set_colour(self, x, y, r, g, b):
 		self.pix[x,y]= (r,g,b)
 
-	def adding_bits(self,x,y,stepnumber,count,binbit,tmpstr):
+	def adding_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
 			r,g,b=self.get_colour(x,y)
 			self.set_colour(x,y,r,g,self.add_bit(b,binbit))
 			count -= 1
 		return ('', count)
 
-	def getting_bits(self,x,y,stepnumber,count,binbit,tmpstr):
+	def getting_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
 			(r,g,b)=self.get_colour(x,y)
 			tmpstr += str(self.get_bit(b))
@@ -94,44 +92,41 @@ class Pictures:
 		return (tmpstr, count)
 
 	def decoding_bits(self, string):
-		tmp=[]
-		for i in range (0, len(string), 8): tmp.append(int(('0b'+string[i:i+8]), 2))
-		return (bytes(tmp))
+		return (bytes(list(map(lambda i: int(('0b'+string[i:i+8]), 2) ,list(range (0, len(string), 8))))))
 
 	def spiral_replacement(self, binstring):
 		self.spiral_walk(0, len(binstring), binstring, ' ', self.adding_bits)
 
 	def spiral_getting(self, block, string):
-		return (self.spiral_walk(0, (block*8)-1, string.zfill(block*8), '', self.getting_bits))
+		return (self.decoding_bits(self.spiral_walk(0, (block*8)-1, string.zfill(block*8), '', self.getting_bits)))
 
 	def spiral_getting2(self, full_lenght, string):
-		return (self.spiral_walk(0, full_lenght-1, string.zfill(full_lenght), '', self.getting_bits))
+		return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, string.zfill(full_lenght), '', self.getting_bits)))
 
 	def spiral_walk(self,stepnumber,count, binstring,tmpstr, method):
 
 		if ((self.x//2>=stepnumber) & (self.y//2>=stepnumber) & (count>-1)):
 
-			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
+			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,count,binstring[-count],tmpstr)
 
 			if not ((self.x>self.y) & (self.y%2==0) & (self.y//2==stepnumber)):
 
-				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,stepnumber,count,binstring[-count],tmpstr)
-
-				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,stepnumber,count,binstring[-count],tmpstr)
+				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,count,binstring[-count],tmpstr)
+				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,count,binstring[-count],tmpstr)
 
 				if (not (self.x<self.y) & (self.x%2==0) & (self.x//2==stepnumber)):
-					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,stepnumber,count,binstring[-count],tmpstr)
+					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,count,binstring[-count],tmpstr)
 
 			stepnumber += 1
 			tmpstr=self.spiral_walk(stepnumber,count,binstring,tmpstr,method)
 
 		elif ((self.x%2==0) | (self.y%2==0)):
 			if (self.x==self.y):
-				(tmpstr, count)=method(stepnumber,stepnumber,stepnumber,count,binstring[-count],tmpstr)
+				(tmpstr, count)=method(stepnumber,stepnumber,count,binstring[-count],tmpstr)
 			if ((self.x<self.y) & (self.x%2==0)):
-				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,stepnumber,count,binstring[-count],tmpstr)
+				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,count,binstring[-count],tmpstr)
 			if ((self.x>self.y) & (self.y%2==0)):
-				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,stepnumber,count,binstring[-count],tmpstr)
+				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,count,binstring[-count],tmpstr)
 		return (tmpstr)
 
 if (len(sys.argv) < 3):  
@@ -143,9 +138,9 @@ if (sys.argv[1] == "get"):
 	p1.load_picture()
 	print ('Picture - '+str(sys.argv[2]))
 	x = Message('',sys.argv[3])
-	x.get_lenght(p1.decoding_bits(p1.spiral_getting(x.block, x.crypted_string)))
+	x.get_lenght(p1.spiral_getting(x.block, x.crypted_string))
 	x.get_full_lenght()
-	x.get_lenght(p1.decoding_bits(p1.spiral_getting2(x.full_lenght, x.crypted_string)))
+	x.get_lenght(p1.spiral_getting2(x.full_lenght, x.crypted_string))
 	print ('Message Lenght - '+str(x.len))
 	print ('Message - '+x.message[0:x.len])
 	print ('Full Message - '+x.message)
