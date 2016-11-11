@@ -50,8 +50,12 @@ class Message:
 		#changing encoding to UTF-8, because AES working only with it.
 		fullmessage = bytes(self.fullmessage, encoding="UTF-8")
 		#encryption
-		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
-		message = self.crypt.encrypt(fullmessage)
+		try:
+			self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
+			message = self.crypt.encrypt(fullmessage)
+		except:
+			print ("Something went crypting string")
+			exit_message()
 		#representing crypted message as normal string. Also removing '0b' that added during casting 
 		tmp = ((''.join (map(bin, message)))[2:]).split('0b')
 		#and adding extra zeros that all bytes getting represented as 8bits.
@@ -60,8 +64,12 @@ class Message:
 #Parsing lenght and fullmessage from received string (used for encryption)
 	def get_lenght(self,string):
 		#decryption
-		self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
-		self.fullmessage=self.crypt.decrypt(string).decode()
+		try:
+			self.crypt = AES.new(self.password, AES.MODE_CBC, b'This is an Test!')
+			self.fullmessage=self.crypt.decrypt(string).decode()
+		except:
+			print ("Something went decrypting string. Most probably your passwor was wrong")
+			exit_message()
 		#splitting string and fullmessage
 		(self.len, self.message) = (self.fullmessage[4:]).split(';',1)
 		#type cast for len
@@ -83,13 +91,21 @@ class Pictures:
 
 #Loading of picture and figuring out size.
 	def load_picture (self):
-		self.im = Image.open(self.name)
-		self.pix = self.im.load()
-		(self.x,self.y)=self.im.size
+		try:
+			self.im = Image.open(self.name)
+			self.pix = self.im.load()
+			(self.x,self.y)=self.im.size
+		except:
+			print ("Something went wrong with opening picture.")
+			exit_message()
 
 #Saving picture as PNG file.
 	def save_picture (self):
-		self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
+		try:
+			self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
+		except:
+			print ("Something went wrong with saving picture.")
+			exit_message()
 
 #replacing of LSB(bit. and bit is char) in integer(num). Probably wouldnt be ever used outside of object.
 	def add_bit(self, num, bit):
@@ -101,11 +117,19 @@ class Pictures:
 
 #getting colour of pixel with x,y coordinates.
 	def get_colour(self, x, y):
-		return(self.pix[x,y])
+		try:
+			return(self.pix[x,y])
+		except:
+			print ("Something wrong with picture file. It must be PNG.")
+			exit_message()
 
 #setting colour of pixel with x,y coordinates.
 	def set_colour(self, x, y, r, g, b):
-		self.pix[x,y]= (r,g,b)
+		try:
+			self.pix[x,y]= (r,g,b)
+		except:
+			print ("Something wrong with picture file. It must be jpg in RGB.")
+			exit_message()
 
 #Adding new value to blue colour LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
 #parameters. Count - is accumulator that decreasing after every call of this method, binbit character that includes new LSB (basicly '0' or '1'), 
@@ -113,9 +137,13 @@ class Pictures:
 #must have take and return same amount of variables as getting bits. There might be more elegant way but i didnt found it so far.
 	def adding_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
-			r,g,b=self.get_colour(x,y)
-			self.set_colour(x,y,r,g,self.add_bit(b,binbit))
-			count -= 1
+			try:
+				r,g,b=self.get_colour(x,y)
+				self.set_colour(x,y,r,g,self.add_bit(b,binbit))
+				count -= 1
+			except:
+				print ("Something wrong with picture file. It must be jpg in RGB.")
+				exit_message()
 		return ('', count)
 
 #Getting value of blue colour LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
@@ -123,9 +151,13 @@ class Pictures:
 #and tmpstr is string with bits. Method returns decreased accumulator and string with just added bit.
 	def getting_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
-			(r,g,b)=self.get_colour(x,y)
-			tmpstr += str(self.get_bit(b))
-			count -= 1
+			try:
+				(r,g,b)=self.get_colour(x,y)
+				tmpstr += str(self.get_bit(b))
+				count -= 1
+			except:
+				print ("Something wrong with picture file. It must be PNG.")
+				exit_message()
 		return (tmpstr, count)
 
 #decoding of string that include bits to normal string 
@@ -134,7 +166,11 @@ class Pictures:
 
 #calling of spiral walk with adding bits method. binstring is string that include message in binary form.
 	def spiral_replacement(self, binstring):
-		self.spiral_walk(0, len(binstring), binstring, ' ', self.adding_bits)
+		if (self.x*self.y)>len(binstring):
+			self.spiral_walk(0, len(binstring), binstring, ' ', self.adding_bits)
+		else:
+			print ("message is too long for your picture")
+			exit_message()
 
 #calling of spiral walk with getting bits method for 1 block of text (block is cipher block size). It should be enough to find out lenght of message.
 	def spiral_getting(self, block):
@@ -142,7 +178,11 @@ class Pictures:
 
 #calling of spiral walk with getting bits method, full_lenght - is message lenght, that suppoused to be obtained after calling previous method.
 	def spiral_getting2(self, full_lenght):
-		return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, ' '.zfill(full_lenght), '', self.getting_bits)))
+		if (self.x*self.y)>full_lenght:
+			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, ' '.zfill(full_lenght), '', self.getting_bits)))
+		else:
+			print ("File corrupted")
+			exit_message()
 
 #spiral_walk - method that makes main part of work. It moving over picture pixels in spiral order and perform some function (getting_bits or
 #adding_bits). Movement made with 4 for cycles, even if while seems more reasonable, but it will lead to longer code and probably worse code.
