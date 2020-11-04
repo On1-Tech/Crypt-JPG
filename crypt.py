@@ -1,24 +1,7 @@
 import random, base64, sys, hashlib
 from PIL import Image
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 from functools import reduce
-
-#Class for basic operations with Text files. Currently not in use.
-class Files:
-
-	def __init__(self, name):
-		self.name=name
-
-	def load(self):
-		file = open(self.name, 'r')
-		tmp = file.read()
-		file.close()
-		return (tmp)
-
-	def save(self, string):
-		file = open(self.name, 'w')
-		file.write(string)
-		file.close()
 
 #Class that handles operations with message including: initialization, padding, converting string to bits, and parsing just encrypted string.
 #Instance variables: message - message itself, block - cipher block size, len - lenght of message(usefull part), vlen - lenght of vector,
@@ -32,49 +15,44 @@ class Message:
 		self.message=message
 		self.block=32
 		self.vlen=16
+		self.len=len(message)
 		self.password=hashlib.sha256(password.encode('utf-8')).digest()
 		#Initialization for empty message
-		self.messages = [message]
-		if (message == ''): 
-			self.len = 0
+		if self.len == 0: 
 			self.crypted_strings = [' ', ' ']
-			self.messages.append ("0;")
+			self.messages=['', '0;']
 		#and for non empty message
-		else:
-			self.len = len(self.message)
-			self.messages.append(str(self.len)+";")
+		else: self.messages=[message, str(self.len)+';']
 
 #Addition of padding to messages (message itself, lenght) and creation of vector that added without padding
 	def make_block(self):
 		for i in [0,1]:
-			if ((len(self.messages[i]) % self.block) != 0): 
-				self.messages[i] += reduce(lambda x,y: x+chr(random.randint(32,127)), (['']+ list(range ((len(self.messages[i]) % self.block), self.block))))
-		self.v=reduce(lambda x,y: x+chr(random.randint(32,127)), (['']+ list(range (0, self.vlen)))) 
+			if len(self.messages[i]) % self.block != 0:
+				for x in range(len(self.messages[i]) % self.block, self.block): self.messages[i] +=chr(random.randint(32,127))   
+		self.v=''
+		for x in range(0, self.vlen): self.v +=chr(random.randint(32,127))   
 		self.messages.append(self.v)
 
 #Coverting full message to bits(bits represented as normal string)
 	def string_to_bits(self):
 		messages = []
-		#coverting vektor to bytes(need for encryption)
-		v=bytes( map(lambda x: ord(x), list(self.v)) )
 		#changing encoding to UTF-8, because AES working only with it. and crypting first 2 elements of messages
+		v=bytes(self.v, encoding="UTF-8")
 		for i in [0,1]:
 			messages.append(bytes(self.messages[i], encoding="UTF-8"))
 			#encryption
 			try:
 				self.crypt = AES.new(self.password, AES.MODE_CBC, v)
 				messages[i] = self.crypt.encrypt(messages[i])
-			except:
-				print ("Something went crypting strings")
-				exit_message()
+			except:	exit_message("Something went crypting strings")
 		#adding vektor to array messages
-		messages.append(bytes(self.v,encoding="UTF-8")  ) 
+		messages.append(v)
 		self.crypted_strings =[]
-		#representing crypted_message as binary in normal string. Also removing '0b' that added during casting
-		for i in [0,1,2]:
-			tmp = ((''.join (map(bin, messages[i])))[2:]).split('0b')
+		#representing crypted_message as binary in string format. Also removing '0b' that added during casting
+		for current_string in messages:
+			binary_string = ''.join(map(bin, current_string))[2:].split('0b')
 			#and adding extra zeros that all bytes getting represented as 8bits.
-			self.crypted_strings.append(''.join((map(lambda x: x.zfill(8), tmp))))
+			self.crypted_strings.append(''.join((map(lambda x: x.zfill(8), binary_string))))
 
 #Parsing lenght and fullmessage from received string (used for encryption)
 	def get_lenght(self,strings):
@@ -86,15 +64,13 @@ class Message:
 			try:
 				self.crypt = AES.new(self.password, AES.MODE_CBC, self.v)
 				self.messages[i]=self.crypt.decrypt(strings[i]).decode()
-			except:
-				print ("Something went decrypting string. Most probably your passwor was wrong")
-				exit_message()
+			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong.")
 		#parsing and type cast for len
-		self.len = int((self.messages[1]. split(';',1))[0])
+		self.len = int(self.messages[1].split(';',1)[0])
 	
 #Finding full lenght of message, that includes padding.(used for decryption)
 	def get_full_lenght(self):
-		self.full_lenght = ((self.len//self.block+1)*self.block)*8
+		self.full_lenght = (self.len//self.block+1)*self.block*8
 
 #Class that handless Picture modifications and related picture operations. Includes: Initialization, loading and saving image, getting and setting
 #least significant bit(LSB) in 1byte integer(used only inside class), getting and setting of least significant bit in Blue colour(in RGB) value of 
@@ -111,18 +87,13 @@ class Pictures:
 		try:
 			self.im = Image.open(self.name)
 			self.pix = self.im.load()
-			(self.x,self.y)=self.im.size
-		except:
-			print ("Something went wrong with opening picture.")
-			exit_message()
+			self.x,self.y=self.im.size
+		except:	exit_message("Something went wrong with opening picture.")
 
 #Saving picture as PNG file.
 	def save_picture (self):
-		try:
-			self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
-		except:
-			print ("Something went wrong with saving picture.")
-			exit_message()
+		try: self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
+		except: exit_message("Something went wrong with saving picture.")
 
 #replacing of LSB(bit. and bit is char) in integer(num). Probably wouldnt be ever used outside of object.
 	def add_bit(self, num, bit):
@@ -134,19 +105,13 @@ class Pictures:
 
 #getting colour of pixel with x,y coordinates.
 	def get_colour(self, x, y):
-		try:
-			return(self.pix[x,y])
-		except:
-			print ("Something wrong with picture file. It must be PNG.")
-			exit_message()
+		try: return(self.pix[x,y])
+		except: exit_message("Something wrong with picture file. It must be PNG.")
 
 #setting colour of pixel with x,y coordinates.
 	def set_colour(self, x, y, r, g, b):
-		try:
-			self.pix[x,y]= (r,g,b)
-		except:
-			print ("Something wrong with picture file. It must be jpg in RGB.")
-			exit_message()
+		try: self.pix[x,y]= (r,g,b)
+		except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
 
 #Adding new value to colours LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
 #parameters. Count - is accumulator that decreasing after every call of this method, binbit arrays of 3 character that includes new LSBs (basicly 
@@ -162,9 +127,7 @@ class Pictures:
 				except: newb = b
 				self.set_colour(x,y,self.add_bit(r,binbit[0]),newg, newb)
 				count -= 1
-			except:
-				print ("Something wrong with picture file. It must be jpg in RGB.")
-				exit_message()
+			except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
 		return ('', count)
 
 #Getting value of colourd LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
@@ -178,9 +141,7 @@ class Pictures:
 				tmpstr[1] += str(self.get_bit(g))
 				tmpstr[2] += str(self.get_bit(b))
 				count -= 1
-			except:
-				print ("Something wrong with picture file. It must be PNG.")
-				exit_message()
+			except:	exit_message("Something wrong with picture file. It must be PNG.")
 		return (tmpstr, count)
 
 #decoding of strings that include bits to normal strings 
@@ -193,9 +154,7 @@ class Pictures:
 	def spiral_replacement(self, binstrings):
 		if (self.x*self.y)>len(binstrings):
 			self.spiral_walk(0, len(binstrings[0]), [binstrings[0], binstrings[1].ljust(len(binstrings[0]),' '), binstrings[2].ljust(len(binstrings[0]),' ') ], ' ', self.adding_bits)
-		else:
-			print ("message is too long for your picture")
-			exit_message()
+		else: exit_message("message is too long for your picture")
 
 #calling of spiral walk with getting bits method for 1 block of text (block is cipher block size). It should be enough to find out lenght of message.
 	def spiral_getting(self, block):
@@ -205,9 +164,7 @@ class Pictures:
 	def spiral_getting2(self, full_lenght):
 		if (self.x*self.y)>full_lenght:
 			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, [' '.zfill(full_lenght),' '.zfill(full_lenght),' '.zfill(full_lenght)], ['','',''], self.getting_bits)))
-		else:
-			print ("File corrupted")
-			exit_message()
+		else: exit_message("File corrupted")
 
 #spiral_walk - method that makes main part of work. It moving over picture pixels in spiral order and perform some function (getting_bits or
 #adding_bits). Movement made with 4 for cycles, even if while seems more reasonable, but it will lead to longer code and probably worse code.
@@ -240,11 +197,13 @@ class Pictures:
 				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
 		return (tmpstr)
 
-def exit_message():
-	sys.exit("""Command line syntax: to crypt crypt.py add [file] [text] [password] 
-	to encrypt crypt.py get [file] [password]""")
+def exit_message(message):
+	if len(message)!=0: message +="\n"
+	sys.exit(message+"""Command line syntax: 
+to crypt crypt.py add [file] [text] [password] 
+to encrypt crypt.py get [file] [password]""")
 
-if (len(sys.argv) < 3): exit_message()
+if (len(sys.argv) < 3): exit_message("")
 
 if (sys.argv[1] == "get"):
 	p1 = Pictures (sys.argv[2])
