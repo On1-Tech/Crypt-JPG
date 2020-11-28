@@ -64,7 +64,7 @@ class Message:
 			try:
 				self.crypt = AES.new(self.password, AES.MODE_CBC, self.v)
 				self.messages[i]=self.crypt.decrypt(strings[i]).decode()
-			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong.")
+			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong. 33")
 		#parsing and type cast for len
 		self.len = int(self.messages[1].split(';',1)[0])
 	
@@ -97,7 +97,8 @@ class Pictures:
 
 #replacing of LSB(bit. and bit is char) in integer(num). Probably wouldnt be ever used outside of object.
 	def add_bit(self, num, bit):
-		return (int(((bin(num))[:-1]+bit), 2))
+		#if bit!=1 or bit!='1': bit='0'
+		return (int((bin(num)[:-1]+bit), 2))
 
 #returns LSB from integer(num). Probably wouldnt be ever used outside of object
 	def get_bit(self,num):
@@ -121,11 +122,13 @@ class Pictures:
 		if count >= 0:
 			try:
 				r,g,b=self.get_colour(x,y)
+				try: newr = self.add_bit(g,binbit[0])
+				except: newr = r
 				try: newg = self.add_bit(g,binbit[1])
 				except: newg = g
 				try: newb = self.add_bit(b,binbit[2])
 				except: newb = b
-				self.set_colour(x,y,self.add_bit(r,binbit[0]),newg, newb)
+				self.set_colour(x,y,newr,newg,newb)
 				count -= 1
 			except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
 		return ('', count)
@@ -136,34 +139,29 @@ class Pictures:
 	def getting_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
 			try:
-				(r,g,b)=self.get_colour(x,y)
-				tmpstr[0] += str(self.get_bit(r))
-				tmpstr[1] += str(self.get_bit(g))
-				tmpstr[2] += str(self.get_bit(b))
+				tmpstr=[x+str(self.get_bit(y)) for x,y in zip(tmpstr,self.get_colour(x,y))]
 				count -= 1
 			except:	exit_message("Something wrong with picture file. It must be PNG.")
 		return (tmpstr, count)
 
 #decoding of strings that include bits to normal strings 
 	def decoding_bits(self, strings):
-		return ([ bytes(list(map(lambda i: int(('0b'+strings[0][i:i+8]), 2) ,list(range (0, len(strings[0]), 8))))), 
-			bytes(list(map(lambda i: int(('0b'+strings[1][i:i+8]), 2) ,list(range (0, len(strings[1]), 8))))), 
-			bytes(list(map(lambda i: int(('0b'+strings[2][i:i+8]), 2) ,list(range (0, len(strings[2]), 8)))))] )
+		return ([ bytes(list(map(lambda i: int(('0b'+s[i:i+8]), 2) ,list(range (0, len(s), 8))))) for s in strings ])
 
 #calling of spiral walk with adding bits method. binstrings is string that include message in binary form.
 	def spiral_replacement(self, binstrings):
 		if (self.x*self.y)>len(binstrings):
-			self.spiral_walk(0, len(binstrings[0]), [binstrings[0], binstrings[1].ljust(len(binstrings[0]),' '), binstrings[2].ljust(len(binstrings[0]),' ') ], ' ', self.adding_bits)
+			self.spiral_walk(0, len(binstrings[0]), [s.ljust(len(binstrings[0]),' ') for s in binstrings], ' ', self.adding_bits)
 		else: exit_message("message is too long for your picture")
 
 #calling of spiral walk with getting bits method for 1 block of text (block is cipher block size). It should be enough to find out lenght of message.
 	def spiral_getting(self, block):
-		return (self.decoding_bits(self.spiral_walk(0, (block*8)-1, [' '.zfill(block*8),' '.zfill(block*8),' '.zfill(block*8)], ['','',''], self.getting_bits)))
+		return (self.decoding_bits(self.spiral_walk(0, (block*8)-1, [' '.zfill(block*8)]*3, ['']*3, self.getting_bits)))
 
 #calling of spiral walk with getting bits method, full_lenght - is message lenght, that suppoused to be obtained after calling previous method.
 	def spiral_getting2(self, full_lenght):
 		if (self.x*self.y)>full_lenght:
-			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, [' '.zfill(full_lenght),' '.zfill(full_lenght),' '.zfill(full_lenght)], ['','',''], self.getting_bits)))
+			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, [' '.zfill(full_lenght)]*3, ['']*3, self.getting_bits)))
 		else: exit_message("File corrupted")
 
 #spiral_walk - method that makes main part of work. It moving over picture pixels in spiral order and perform some function (getting_bits or
@@ -175,26 +173,26 @@ class Pictures:
 
 		if ((self.x//2>=stepnumber) & (self.y//2>=stepnumber) & (count>-1)):
 		                                                          
-			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 
 			if not ((self.x>self.y) & (self.y%2==0) & (self.y//2==stepnumber)):
 
-				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
-				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
+				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 
 				if not ((self.x<self.y) & (self.x%2==0) & (self.x//2==stepnumber)):
-					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 
 			stepnumber += 1
 			tmpstr=self.spiral_walk(stepnumber,count,binstring,tmpstr,method)
 
 		elif ((self.x%2==0) | (self.y%2==0)):
 			if (self.x==self.y):
-				(tmpstr, count)=method(stepnumber,stepnumber,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+				(tmpstr, count)=method(stepnumber,stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 			if ((self.x<self.y) & (self.x%2==0)):
-				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 			if ((self.x>self.y) & (self.y%2==0)):
-				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,count,[binstring[0][-count], binstring[1][-count], binstring[2][-count]],tmpstr)
+				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
 		return (tmpstr)
 
 def exit_message(message):
