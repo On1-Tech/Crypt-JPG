@@ -149,7 +149,7 @@ class Pictures:
 
 #calling of spiral walk with adding bits method. binstrings is string that include message in binary form.
 	def spiral_replacement(self, binstrings):
-		if (self.x*self.y)>len(binstrings):
+		if self.x*self.y>len(binstrings):
 			self.spiral_walk(0, len(binstrings[0]), [s.ljust(len(binstrings[0]),' ') for s in binstrings], ' ', self.adding_bits)
 		else: exit_message("message is too long for your picture")
 
@@ -159,39 +159,32 @@ class Pictures:
 
 #calling of spiral walk with getting bits method, full_lenght - is message lenght, that suppoused to be obtained after calling previous method.
 	def spiral_getting2(self, full_lenght):
-		if (self.x*self.y)>full_lenght:
+		if self.x*self.y>full_lenght:
 			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, [' '.zfill(full_lenght)]*3, ['']*3, self.getting_bits)))
 		else: exit_message("File corrupted")
 
-#spiral_walk - method that makes main part of work. It moving over picture pixels in spiral order and perform some function (getting_bits or
-#adding_bits). Movement made with 4 for cycles, even if while seems more reasonable, but it will lead to longer code and probably worse code.
-#this function using recursion. Parametrs: stepnumber - always 0, though it changes during recursion, binstring - strings that represent messages
-#in binary way (or empty string in case of getting_bits), tmpstr - strings that keeps bits from picture in case of getting_bits(and empty string
-#in case of adding bits), and method - function that performed during movement (getting_bits or adding_bits).
+#main method that make most of work. It moving over picture pixels in spiral order and perform some function (getting_bits or adding_bits). 
+#Movement made with 4 for cycles. This method using recursion. Parametrs: stepnumber - always 0, though it changes during recursion, binstring - 
+#strings that represent messages in binary way (or empty string in case of getting_bits), tmpstr - strings that keeps bits from picture in case
+#of getting_bits(and empty string in case of adding bits), and method - function that performed during movement (getting_bits or adding_bits).
 	def spiral_walk(self,stepnumber,count, binstring,tmpstr, method):
+		def c_binstring():
+			return([cbinstring[-count] for cbinstring in binstring])
 
-		if ((self.x//2>=stepnumber) & (self.y//2>=stepnumber) & (count>-1)):
-		                                                          
-			for i in range (stepnumber,self.x-stepnumber): (tmpstr, count)=method(stepnumber,i,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-
-			if not ((self.x>self.y) & (self.y%2==0) & (self.y//2==stepnumber)):
-
-				for i in range (stepnumber,self.y-stepnumber): (tmpstr, count)=method(i,self.x-stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-				for i in range (self.x-stepnumber,stepnumber,-1): (tmpstr, count)=method(self.y-stepnumber,i,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-
-				if not ((self.x<self.y) & (self.x%2==0) & (self.x//2==stepnumber)):
-					for i in range (self.y-stepnumber,stepnumber,-1): (tmpstr, count)=method(i,stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-
+		if self.x//2>=stepnumber & self.y//2>=stepnumber & count>-1:
+			for i in range(stepnumber,self.x-stepnumber): tmpstr, count=method(stepnumber,i,count,c_binstring(),tmpstr)
+			if not self.x>self.y & self.y%2==0 & self.y//2==stepnumber:
+				for i in range(stepnumber,self.y-stepnumber): tmpstr, count=method(i,self.x-stepnumber,count,c_binstring(),tmpstr)
+				for i in range(self.x-stepnumber,stepnumber,-1): tmpstr, count=method(self.y-stepnumber,i,count,c_binstring(),tmpstr)
+				if not self.x<self.y & self.x%2==0 & self.x//2==stepnumber:
+					for i in range(self.y-stepnumber,stepnumber,-1): tmpstr, count=method(i,stepnumber,count,c_binstring(),tmpstr)
 			stepnumber += 1
 			tmpstr=self.spiral_walk(stepnumber,count,binstring,tmpstr,method)
 
-		elif ((self.x%2==0) | (self.y%2==0)):
-			if (self.x==self.y):
-				(tmpstr, count)=method(stepnumber,stepnumber,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-			if ((self.x<self.y) & (self.x%2==0)):
-				(tmpstr, count)=method(self.y-stepnumber+1,stepnumber-1,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
-			if ((self.x>self.y) & (self.y%2==0)):
-				(tmpstr, count)=method(stepnumber-1,self.x-stepnumber+1,count,[cbinstring[-count] for cbinstring in binstring],tmpstr)
+		elif self.x%2==0 | self.y%2==0:
+			if self.x==self.y: tmpstr, count=method(stepnumber,stepnumber,count,c_binstring(),tmpstr)
+			if self.x<self.y & self.x%2==0: tmpstr, count=method(self.y-stepnumber+1,stepnumber-1,count,c_binstring(),tmpstr)
+			if self.x>self.y & self.y%2==0: tmpstr, count=method(stepnumber-1,self.x-stepnumber+1,count,c_binstring(),tmpstr)
 		return (tmpstr)
 
 def exit_message(message):
@@ -200,9 +193,9 @@ def exit_message(message):
 to crypt crypt.py add [file] [text] [password] 
 to encrypt crypt.py get [file] [password]""")
 
-if (len(sys.argv) < 3): exit_message("")
+if len(sys.argv) < 3: exit_message("")
 
-if (sys.argv[1] == "get"):
+if sys.argv[1] == "get":
 	p1 = Pictures (sys.argv[2])
 	p1.load_picture()
 	print ('Picture - '+str(sys.argv[2]))
@@ -214,7 +207,7 @@ if (sys.argv[1] == "get"):
 	print ('Message - '+x.messages[0][:x.len])
 	print ('Full Message - '+x.messages[0])
 
-if (sys.argv[1] == "add"):
+if sys.argv[1] == "add":
 	x = Message (sys.argv[3], sys.argv[4])
 	print ("Message - "+x.message)
 	print ("Message Length - "+str(x.len))
