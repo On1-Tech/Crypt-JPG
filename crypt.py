@@ -6,8 +6,7 @@ from functools import reduce
 #Class that handles operations with message including: initialization, padding, converting string to bits, and parsing just encrypted string.
 #Instance variables: message - message itself, block - cipher block size, len - lenght of message(usefull part), vlen - lenght of vector,
 #password - password used for encyption/decription (hashed), messages - array of 3 elements that include message itself, lenght and vector, 
-#v - vektor, crypt - instance of AES(not used outside class), crypted_strings - crypted array messages(vector is not crypted), full_lenght - 
-#lenght of message with padding 
+#v - vektor, crypt - instance of AES, crypted_strings - crypted array messages(vector is not crypted), full_lenght - lenght of message with padding 
 class Message:
 
 #Initialization. When it used without password, "Example" used as password. User password hashed. Also it adding lenght to of message to fullmessage. 
@@ -42,8 +41,8 @@ class Message:
 			messages.append(bytes(self.messages[i], encoding="UTF-8"))
 			#encryption
 			try:
-				self.crypt = AES.new(self.password, AES.MODE_CBC, v)
-				messages[i] = self.crypt.encrypt(messages[i])
+				self.__crypt = AES.new(self.password, AES.MODE_CBC, v)
+				messages[i] = self.__crypt.encrypt(messages[i])
 			except:	exit_message("Something went crypting strings")
 		#adding vektor to array messages
 		messages.append(v)
@@ -62,9 +61,9 @@ class Message:
 		#decryption
 		for i in [0,1]:
 			try:
-				self.crypt = AES.new(self.password, AES.MODE_CBC, self.v)
-				self.messages[i]=self.crypt.decrypt(strings[i]).decode()
-			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong. 33")
+				self.__crypt = AES.new(self.password, AES.MODE_CBC, self.v)
+				self.messages[i]=self.__crypt.decrypt(strings[i]).decode()
+			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong.")
 		#parsing and type cast for len
 		self.len = int(self.messages[1].split(';',1)[0])
 	
@@ -95,13 +94,13 @@ class Pictures:
 		try: self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
 		except: exit_message("Something went wrong with saving picture.")
 
-#replacing of LSB(bit. and bit is char) in integer(num). Probably wouldnt be ever used outside of object.
-	def add_bit(self, num, bit):
+#replacing of LSB(bit. and bit is char) in integer(num).
+	def __add_bit(self, num, bit):
 		#if bit!=1 or bit!='1': bit='0'
 		return (int((bin(num)[:-1]+bit), 2))
 
-#returns LSB from integer(num). Probably wouldnt be ever used outside of object
-	def get_bit(self,num):
+#returns LSB from integer(num).
+	def __get_bit(self,num):
 		return (bin(num)[-1:])
 
 #getting colour of pixel with x,y coordinates.
@@ -122,11 +121,11 @@ class Pictures:
 		if count >= 0:
 			try:
 				r,g,b=self.get_colour(x,y)
-				try: newr = self.add_bit(g,binbit[0])
+				try: newr = self.__add_bit(g,binbit[0])
 				except: newr = r
-				try: newg = self.add_bit(g,binbit[1])
+				try: newg = self.__add_bit(g,binbit[1])
 				except: newg = g
-				try: newb = self.add_bit(b,binbit[2])
+				try: newb = self.__add_bit(b,binbit[2])
 				except: newb = b
 				self.set_colour(x,y,newr,newg,newb)
 				count -= 1
@@ -139,14 +138,14 @@ class Pictures:
 	def getting_bits(self,x,y,count,binbit,tmpstr):
 		if count >= 0:
 			try:
-				tmpstr=[x+str(self.get_bit(y)) for x,y in zip(tmpstr,self.get_colour(x,y))]
+				tmpstr=[x+str(self.__get_bit(y)) for x,y in zip(tmpstr,self.get_colour(x,y))]
 				count -= 1
 			except:	exit_message("Something wrong with picture file. It must be PNG.")
 		return (tmpstr, count)
 
 #decoding of strings that include bits to normal strings 
 	def decoding_bits(self, strings):
-		return ([ bytes(list(map(lambda i: int(('0b'+s[i:i+8]), 2) ,list(range (0, len(s), 8))))) for s in strings ])
+		return ([bytes([int(('0b'+s[i:i+8]), 2) for i in range (0, len(s), 8)]) for s in strings])
 
 #calling of spiral walk with adding bits method. binstrings is string that include message in binary form.
 	def spiral_replacement(self, binstrings):
