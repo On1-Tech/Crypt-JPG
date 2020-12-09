@@ -3,85 +3,83 @@ from PIL import Image
 from Cryptodome.Cipher import AES
 from functools import reduce
 
-#Class that handles operations with message including: initialization, padding, converting string to bits, and parsing just encrypted string.
-#Instance variables: message - message itself, block - cipher block size, len - lenght of message(usefull part), vlen - lenght of vector,
-#password - password used for encyption/decription (hashed), messages - array of 3 elements that include message itself, lenght and vector, 
-#v - vektor, crypt - instance of AES, crypted_strings - crypted array messages(vector is not crypted), full_lenght - lenght of message with padding 
+#Class that handles operations with message include: padding, converting string to bits, and parsing encrypted string. 
+#Instance variables are:  message - message itself, block - cipher block size, len - length of message, vlen - length of vector, 
+#password - password used for encyption/decription(hashed), messages - list with message itself, length and vector, v - vektor, 
+#crypt - instance of AES, crypted_strings - list with crypted messages(vector not crypted), full_length - length of message with padding.
 class Message:
 
-#Initialization. When it used without password, "Example" used as password. User password hashed. Also it adding lenght to of message to fullmessage. 
+#If there is no password then "Example" will used as password. 
 	def __init__(self,message='',password='Example'):
 		self.message=message
 		self.block=32
 		self.vlen=16
 		self.len=len(message)
-		self.password=hashlib.sha256(password.encode('utf-8')).digest()
-		#Initialization for empty message
-		if self.len == 0: 
-			self.crypted_strings = [' ', ' ']
-			self.messages=['', '0;']
-		#and for non empty message
-		else: self.messages=[message, str(self.len)+';']
+		self.password=hashlib.sha256(password.encode('utf-8')).digest() #hashing password
+		if self.len == 0: self.messages=['', '0;'] #if message is empty
+		else: self.messages=[message, str(self.len)+';'] #otherwise
 
-#Addition of padding to messages (message itself, lenght) and creation of vector that added without padding
-	def make_block(self):
-		for i in [0,1]:
-			if len(self.messages[i]) % self.block != 0:
-				for x in range(len(self.messages[i]) % self.block, self.block): self.messages[i] +=chr(random.randint(32,127))   
+#Creation of vector and addition of padding to messages (message itself, length)
+	def prepare(self):
 		self.v=''
-		for x in range(0, self.vlen): self.v +=chr(random.randint(32,127))   
+		for num in range(0, self.vlen): self.v += chr(random.randint(32,127))   
+		for num in (0,1):
+			if len(self.messages[num]) % self.block != 0:
+				for x in range(len(self.messages[num]) % self.block, self.block): self.messages[num] += chr(random.randint(32,127))		   
 		self.messages.append(self.v)
+		self.v=bytes(self.v, encoding="UTF-8")
 
 #Coverting full message to bits(bits represented as normal string)
-	def string_to_bits(self):
+	def encrypt(self):
+		self.prepare()
 		messages = []
-		#changing encoding to UTF-8, because AES working only with it. and crypting first 2 elements of messages
-		v=bytes(self.v, encoding="UTF-8")
-		for i in [0,1]:
-			messages.append(bytes(self.messages[i], encoding="UTF-8"))
-			#encryption
-			try:
-				self.__crypt = AES.new(self.password, AES.MODE_CBC, v)
-				messages[i] = self.__crypt.encrypt(messages[i])
-			except:	exit_message("Something went crypting strings")
-		#adding vektor to array messages
-		messages.append(v)
-		self.crypted_strings =[]
-		#representing crypted_message as binary in string format. Also removing '0b' that added during casting
-		for current_string in messages:
-			binary_string = ''.join(map(bin, current_string))[2:].split('0b')
-			#and adding extra zeros that all bytes getting represented as 8bits.
-			self.crypted_strings.append(''.join((map(lambda x: x.zfill(8), binary_string))))
-
-#Parsing lenght and fullmessage from received string (used for encryption)
-	def get_lenght(self,strings):
-		#cutting extras
-		self.v=strings[2][0:self.vlen]
-		strings[1] = strings[1][0:self.block]
-		#decryption
-		for i in [0,1]:
+		#changing encoding to UTF-8(because AES working only with it) and encrypting messages.
+		for num in (0,1):
+			messages.append(bytes(self.messages[num], encoding="UTF-8"))
 			try:
 				self.__crypt = AES.new(self.password, AES.MODE_CBC, self.v)
-				self.messages[i]=self.__crypt.decrypt(strings[i]).decode()
-			except: exit_message("Something went wrong with decrypting string. Most probably your password was wrong.")
-		#parsing and type cast for len
-		self.len = int(self.messages[1].split(';',1)[0])
+				messages[num] = self.__crypt.encrypt(messages[num])
+			except:	exit_message("Something went wrong with encrypting strings.")
+		messages.append(self.v) #adding vektor as 3rd element of list
+		self.crypted_strings =[]
+		#representing encrypted message as binary in string format.
+		for current_string in messages:	self.crypted_strings.append(''.join(map(lambda x: bin(x)[2:].zfill(8), current_string)))
+			
+#Parsing lenght and fullmessage from received string (used for encryption)
+	def decrypt(self,strings):
+		self.v=strings[2][:self.vlen] #cutting extras for string[1] and v
+		strings[1] = strings[1][:self.block]
+		self.messages=[] #voiding since we are getting new self.messages after encoding
+		#decryption
+		try:
+			for current_string in strings[:-1]:
+				self.__crypt = AES.new(self.password, AES.MODE_CBC, self.v)
+				self.messages.append(self.__crypt.decrypt(current_string).decode())
+		except: exit_message("Something went wrong with decrypting string. Most probably it was your password.")
+		self.len = int(self.messages[1].split(';',1)[0]) #parsing len
 	
-#Finding full lenght of message, that includes padding.(used for decryption)
+#Full lenght of message including padding.
 	def get_full_lenght(self):
 		self.full_lenght = (self.len//self.block+1)*self.block*8
 
-#Class that handless Picture modifications and related picture operations. Includes: Initialization, loading and saving image, getting and setting
-#least significant bit(LSB) in 1byte integer(used only inside class), getting and setting of least significant bit in Blue colour(in RGB) value of 
-#particular pixel, spiral walk over pixels in picture with different operations.
-#Instance variables: name - filename of picture, x,y - size of picture, pix - picture object, im - image file.
+	def __str__(self):
+		if self.message!='':
+			return f"Message - {self.message}\nFull Message - {self.messages[0]}\nMessage Length - {self.len}\nBinary version({len(self.crypted_strings[0])} bits) - {self.crypted_strings[0]}"
+		else:
+			return f"Message - {self.messages[0][:self.len]}\nFull Message - {self.messages[0]}\nMessage Length - {self.len}"
+
+	def __repr__(self):
+		return f"{self.message}"
+
+#Class that handles Picture operations. Includes: Loading and saving image, getting and setting least significant bit(LSB) in 1byte integer, 
+#getting and setting least significant bits of particular pixel, spiral walk performing different operations over pixels in picture.
+#Instance variables: filename - filename of picture, x,y - size of picture, pix - picture object, im - image file.
 class Pictures:
 
-#Initialization with filename
-	def __init__(self, name):
-		self.name=name
+	def __init__(self, filename):
+		self.name=filename
 
-#Loading of picture and figuring out size.
+#Loading picture and figuring out size.
 	def load_picture (self):
 		try:
 			self.im = Image.open(self.name)
@@ -94,98 +92,127 @@ class Pictures:
 		try: self.im.save(self.name.rsplit('.',1)[0]+'.png',"PNG")
 		except: exit_message("Something went wrong with saving picture.")
 
-#replacing of LSB(bit. and bit is char) in integer(num).
+#Replacing of LSB in integer(num).
 	def __add_bit(self, num, bit):
-		#if bit!=1 or bit!='1': bit='0'
-		return (int((bin(num)[:-1]+bit), 2))
+		if bit==' ': bit='0'
+		return (int('0b'+bin(num)[2:].zfill(8)[:-1]+bit, 2))
 
-#returns LSB from integer(num).
+#Getting LSB from integer(num).
 	def __get_bit(self,num):
 		return (bin(num)[-1:])
 
-#getting colour of pixel with x,y coordinates.
+#Getting colour of pixel with x,y coordinates.
 	def get_colour(self, x, y):
 		try: return(self.pix[x,y])
 		except: exit_message("Something wrong with picture file. It must be PNG.")
 
-#setting colour of pixel with x,y coordinates.
+#Setting colour of pixel with x,y coordinates.
 	def set_colour(self, x, y, r, g, b):
 		try: self.pix[x,y]= (r,g,b)
 		except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
 
-#Adding new value to colours LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
-#parameters. Count - is accumulator that decreasing after every call of this method, binbit arrays of 3 character that includes new LSBs (basicly 
-#'0' or '1'), and tmpstr that not really used in this method, but i had to keep it since it is called from spiral_walk method where it given 
-#as param. And it must have take and return same amount of variables as getting bits. There might be more elegant way but i didnt found it so far.
-	def adding_bits(self,x,y,count,binbit,tmpstr):
-		if count >= 0:
-			try:
+#Adding new value to colours LSB of pixel (with x,y coordinates). It is called from spiral_walk method so it have some extra parameters, because
+#all methods called by spiral_walk suppoused to take and return same arguments. Count - accumulator that decreasing after every call of this 
+#method, colour_bits arrays of 3 character that includes new LSBs, and stored_data is not im use.
+	def adding_bits(self,x,y,counter,colour_bits,stored_data):
+		try:
+			if counter >= 0:
 				r,g,b=self.get_colour(x,y)
-				try: newr = self.__add_bit(g,binbit[0])
+				try: newr = self.__add_bit(r,colour_bits[0])
 				except: newr = r
-				try: newg = self.__add_bit(g,binbit[1])
+				try: newg = self.__add_bit(g,colour_bits[1])
 				except: newg = g
-				try: newb = self.__add_bit(b,binbit[2])
+				try: newb = self.__add_bit(b,colour_bits[2])
 				except: newb = b
 				self.set_colour(x,y,newr,newg,newb)
-				count -= 1
-			except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
-		return ('', count)
+				counter -=1
+		except:	exit_message("Something wrong with picture file. It must be jpg in RGB.")
+		return ('', counter)
 
-#Getting value of colourd LSB of pixel (with x,y coordinates). It is suppoused to be called from spiral walk method so it have some extra
-#parameters. Count - is accumulator that decreasing after every call of this method, binbit array of characters that includes new LSBs (basicly 
-#'0' or '1'), and tmpstr is string with bits. Method returns decreased accumulator and array of strings with just added bit.
-	def getting_bits(self,x,y,count,binbit,tmpstr):
-		if count >= 0:
-			try:
-				tmpstr=[x+str(self.__get_bit(y)) for x,y in zip(tmpstr,self.get_colour(x,y))]
-				count -= 1
-			except:	exit_message("Something wrong with picture file. It must be PNG.")
-		return (tmpstr, count)
+#Getting value of pixel(with x,y coordinates) colours LSB. Normally it is executed from spiral_walk method. Count - accumulator that decreasing 
+#after every call of this method, colour_bits array of characters that includes new LSBs (basicly 0 or 1), and stored_data is string with bits. 
+#Returns accumulator and list of strings with just added bits.
+	def getting_bits(self,x,y,counter,colour_bits,stored_data):
+		try:
+			if counter >= 0: 
+				stored_data=[x+str(self.__get_bit(y)) for x,y in zip(stored_data,self.get_colour(x,y))]
+				counter -= 1
+		except:	exit_message("Something wrong with picture file. It must be PNG.")
+		return (stored_data, counter)
 
-#decoding of strings that include bits to normal strings 
-	def decoding_bits(self, strings):
-		return ([bytes([int(('0b'+s[i:i+8]), 2) for i in range (0, len(s), 8)]) for s in strings])
+#Decoding strings of bits to normal ones. 
+	def decoding_bits(self, bin_strings):
+		return ([bytes([int(('0b'+s[i:i+8]), 2) for i in range (0, len(s), 8)]) for s in bin_strings])
 
-#calling of spiral walk with adding bits method. binstrings is string that include message in binary form.
-	def spiral_replacement(self, binstrings):
-		if self.x*self.y>len(binstrings):
-			self.spiral_walk(0, len(binstrings[0]), [s.ljust(len(binstrings[0]),' ') for s in binstrings], ' ', self.adding_bits)
-		else: exit_message("message is too long for your picture")
+#Calling spiral_walk with method for adding message. bin_strings is message in binary form.
+	def spiral_set_message(self, bin_strings):
+		if self.x*self.y>len(bin_strings):
+			self.spiral_walk(0, len(bin_strings[0]), [s.ljust(len(bin_strings[0]),' ') for s in bin_strings], ' ', self.adding_bits)
+		else: exit_message("Message is too long for your picture.")
 
-#calling of spiral walk with getting bits method for 1 block of text (block is cipher block size). It should be enough to find out lenght of message.
-	def spiral_getting(self, block):
-		return (self.decoding_bits(self.spiral_walk(0, (block*8)-1, [' '.zfill(block*8)]*3, ['']*3, self.getting_bits)))
-
-#calling of spiral walk with getting bits method, full_lenght - is message lenght, that suppoused to be obtained after calling previous method.
-	def spiral_getting2(self, full_lenght):
+#Calling of spiral_walk method for getting message, full_lenght - is message lenght, that suppoused to be obtained.
+	def spiral_get_message(self, full_lenght):
 		if self.x*self.y>full_lenght:
 			return (self.decoding_bits(self.spiral_walk(0, full_lenght-1, [' '.zfill(full_lenght)]*3, ['']*3, self.getting_bits)))
-		else: exit_message("File corrupted")
+		else: exit_message("File corrupted.")
 
-#main method that make most of work. It moving over picture pixels in spiral order and perform some function (getting_bits or adding_bits). 
-#Movement made with 4 for cycles. This method using recursion. Parametrs: stepnumber - always 0, though it changes during recursion, binstring - 
-#strings that represent messages in binary way (or empty string in case of getting_bits), tmpstr - strings that keeps bits from picture in case
-#of getting_bits(and empty string in case of adding bits), and method - function that performed during movement (getting_bits or adding_bits).
-	def spiral_walk(self,stepnumber,count, binstring,tmpstr, method):
+#Basically previous method for 1 block of text(cipher block size). It is enough to find out real lenght of message.
+	def spiral_get_len(self, block):
+		return(self.spiral_get_message(block*8))
+
+#Main method that make most of work. It moving over picture pixels in spiral order and perform some operation(getting_bits or adding_bits)
+#recursively. Movement made with 4 for cycles. Parametrs: step_number - always 0 at start, bin_strings - strings that represent message in 
+#binary way (or empty in case of getting_bits), stored_data - bits from picture in case of getting_bits, and method - function that performed.
+	def spiral_walk(self,step_number,counter,bin_strings,stored_data,method):
+		#forming list with bits for every colour (r,g,b)
 		def c_binstring():
-			return([cbinstring[-count] for cbinstring in binstring])
+			return([cbinstring[-counter] for cbinstring in bin_strings])
 
-		if self.x//2>=stepnumber & self.y//2>=stepnumber & count>-1:
-			for i in range(stepnumber,self.x-stepnumber): tmpstr, count=method(stepnumber,i,count,c_binstring(),tmpstr)
-			if not self.x>self.y & self.y%2==0 & self.y//2==stepnumber:
-				for i in range(stepnumber,self.y-stepnumber): tmpstr, count=method(i,self.x-stepnumber,count,c_binstring(),tmpstr)
-				for i in range(self.x-stepnumber,stepnumber,-1): tmpstr, count=method(self.y-stepnumber,i,count,c_binstring(),tmpstr)
-				if not self.x<self.y & self.x%2==0 & self.x//2==stepnumber:
-					for i in range(self.y-stepnumber,stepnumber,-1): tmpstr, count=method(i,stepnumber,count,c_binstring(),tmpstr)
-			stepnumber += 1
-			tmpstr=self.spiral_walk(stepnumber,count,binstring,tmpstr,method)
+		if self.x//2>=step_number & self.y//2>=step_number & counter>-1:
+			for i in range(step_number,self.x-step_number): stored_data, counter=method(step_number,i,counter,c_binstring(),stored_data)
+			if not self.x>self.y & self.y%2==0 & self.y//2==step_number:
+				for i in range(step_number,self.y-step_number): stored_data, counter=method(i,self.x-step_number,counter,c_binstring(),stored_data)
+				for i in range(self.x-step_number,step_number,-1): stored_data, counter=method(self.y-step_number,i,counter,c_binstring(),stored_data)
+				if not self.x<self.y & self.x%2==0 & self.x//2==step_number:
+					for i in range(self.y-step_number,step_number,-1): stored_data, counter=method(i,step_number,counter,c_binstring(),stored_data)
+			step_number +=1
+			stored_data=self.spiral_walk(step_number,counter,bin_strings,stored_data,method)
 
 		elif self.x%2==0 | self.y%2==0:
-			if self.x==self.y: tmpstr, count=method(stepnumber,stepnumber,count,c_binstring(),tmpstr)
-			if self.x<self.y & self.x%2==0: tmpstr, count=method(self.y-stepnumber+1,stepnumber-1,count,c_binstring(),tmpstr)
-			if self.x>self.y & self.y%2==0: tmpstr, count=method(stepnumber-1,self.x-stepnumber+1,count,c_binstring(),tmpstr)
-		return (tmpstr)
+			if self.x==self.y: stored_data, counter=method(step_number,step_number,counter,c_binstring(),stored_data)
+			if self.x<self.y & self.x%2==0: stored_data, counter=method(self.y-step_number+1,step_number-1,counter,c_binstring(),stored_data)
+			if self.x>self.y & self.y%2==0: stored_data, counter=method(step_number-1,self.x-step_number+1,counter,c_binstring(),stored_data)
+		return (stored_data)
+
+	def __repr__(self):
+		return f"{self.name}"
+
+	def __str__(self):
+		return f"{self.name}"
+
+#Childclass for Pictures that include Message. Everything is pretty simple, so probably no extra comments needed
+class Picture_with_Message(Pictures):
+	def __init__(self,filename,message='',password='Example'):
+		Pictures.__init__(self,filename)
+		self.crypted_message=Message(message,password)
+
+	def get_message(self):
+		Pictures.load_picture(self)
+		self.crypted_message.decrypt(Pictures.spiral_get_len(self,self.crypted_message.block))
+		self.crypted_message.get_full_lenght()
+		self.crypted_message.decrypt(Pictures.spiral_get_message(self,self.crypted_message.full_lenght))
+
+	def set_message(self):
+		self.crypted_message.encrypt()
+		Pictures.load_picture(self)
+		Pictures.spiral_set_message(self,self.crypted_message.crypted_strings)
+		Pictures.save_picture(self)
+
+	def __repr__(self):
+		return f"Picture - {Pictures.__str__(self)}\n{self.crypted_message}"
+
+	def __str__(self):
+		return f"Picture - '{Pictures.__str__(self)}\n{self.crypted_message}"
 
 def exit_message(message):
 	if len(message)!=0: message +="\n"
@@ -196,27 +223,11 @@ to encrypt crypt.py get [file] [password]""")
 if len(sys.argv) < 3: exit_message("")
 
 if sys.argv[1] == "get":
-	p1 = Pictures (sys.argv[2])
-	p1.load_picture()
-	print ('Picture - '+str(sys.argv[2]))
-	x = Message('',sys.argv[3])
-	x.get_lenght(p1.spiral_getting(x.block))
-	x.get_full_lenght()
-	x.get_lenght(p1.spiral_getting2(x.full_lenght))
-	print ('Message Lenght - '+str(x.len))
-	print ('Message - '+x.messages[0][:x.len])
-	print ('Full Message - '+x.messages[0])
+	p=Picture_with_Message(sys.argv[2],'',sys.argv[3])
+	p.get_message()
+	print(p)
 
 if sys.argv[1] == "add":
-	x = Message (sys.argv[3], sys.argv[4])
-	print ("Message - "+x.message)
-	print ("Message Length - "+str(x.len))
-	x.make_block()
-	x.string_to_bits()
-	#print ("Line ready for crypting("+str(len(x.messages[0]))+'bytes) - '+x.messages[0])
-	print ("binary version("+str(len(x.crypted_strings[0]))+' bits) - '+x.crypted_strings[0])
-	p = Pictures (sys.argv[2])
-	p.load_picture()
-	p.spiral_replacement(x.crypted_strings)
-	p.save_picture()
-	print ("Message added to picture.")
+	p=Picture_with_Message(sys.argv[2],sys.argv[3],sys.argv[4])
+	p.set_message()
+	print (str(p)+'\nMessage added to picture.')
